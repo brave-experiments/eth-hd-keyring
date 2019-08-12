@@ -1,52 +1,95 @@
+/* global chrome */
 const EventEmitter = require('events').EventEmitter
 const hdkey = require('ethereumjs-wallet/hdkey')
-const bip39 = require('bip39')
 const ethUtil = require('ethereumjs-util')
 const sigUtil = require('eth-sig-util')
+const braveCrypto = require('brave-crypto')
 
 // Options:
 const hdPathString = `m/44'/60'/0'/0`
 const type = 'HD Key Tree'
 
+// Utility methods to convert between uint8array and arraybuffer
+const uint8ToArrayBuf = (array) => {
+  return array.buffer.slice(array.byteOffset, array.byteLength + array.byteOffset)
+}
+const bufToUint8Array = (buf) => {
+  return new Uint8Array(buf)
+}
+
+// polyfill chrome.braveWallets API for tests
+if (typeof global === 'object' && global.it) {
+  if (typeof chrome === 'undefined') {
+    var chrome = {}
+  }
+  if (!chrome.braveWallet) {
+    chrome.braveWallet = {}
+    chrome.braveWallet.getWalletSeed = (key, cb) => {
+      // Just use 32 random bytes generated in JS for now
+      const seed = braveCrypto.getSeed(32)
+      // The chrome.* API takes and returns arraybuffers
+      cb(uint8ToArrayBuf(seed))
+    }
+  }
+}
+
 class HdKeyring extends EventEmitter {
 
   /* PUBLIC METHODS */
 
-  constructor (opts = {}) {
+  constructor (opts = {}, skipInit = false) {
     super()
     this.type = type
-    this.deserialize(opts)
+    this.deserialize(opts, skipInit)
   }
 
   serialize () {
     return Promise.resolve({
       mnemonic: this.mnemonic,
       numberOfAccounts: this.wallets.length,
-      hdPath: this.hdPath,
+      hdPath: this.hdPath
     })
   }
 
-  deserialize (opts = {}) {
+  deserialize (opts = {}, skipInit = false) {
     this.opts = opts || {}
     this.wallets = []
     this.mnemonic = null
     this.root = null
     this.hdPath = opts.hdPath || hdPathString
-
-    if (opts.mnemonic) {
-      this._initFromMnemonic(opts.mnemonic)
+    this.encryptionKey = opts.encryptionKey
+    if (skipInit !== true) {
+      // Useful for tests since init is async and must be called separately if
+      // we want an assertion to run after init is finished
+      return this.init()
     }
+  }
 
-    if (opts.numberOfAccounts) {
-      return this.addAccounts(opts.numberOfAccounts)
+  init () {
+    if (this.opts.mnemonic) {
+      this._initFromMnemonic(this.opts.mnemonic)
     }
-
+    if (this.opts.numberOfAccounts) {
+      return this.addAccounts(this.opts.numberOfAccounts)
+    }
     return Promise.resolve([])
   }
 
-  addAccounts (numberOfAccounts = 1) {
+  async addAccounts (numberOfAccounts = 1) {
     if (!this.root) {
-      this._initFromMnemonic(bip39.generateMnemonic())
+      if (!this.encryptionKey) {
+        throw new Error('Cannot initialize wallet without an encryption key')
+      }
+      // chrome.braveWallet.getWalletSeed permission must ONLY be granted to
+      // this extension
+      if (typeof chrome === 'object' && chrome.braveWallet) {
+        const promiseGetSeed = (key) =>
+          new Promise((resolve) => chrome.braveWallet.getWalletSeed(key, resolve))
+        const seed = await promiseGetSeed(uint8ToArrayBuf(this.encryptionKey))
+        this._initFromSeed(bufToUint8Array(seed))
+      } else {
+        throw new Error('chrome.braveWallet is not defined')
+      }
     }
 
     const oldLen = this.wallets.length
@@ -126,11 +169,23 @@ class HdKeyring extends EventEmitter {
 
   _initFromMnemonic (mnemonic) {
     this.mnemonic = mnemonic
-    const seed = bip39.mnemonicToSeed(mnemonic)
+    const seed = braveCrypto.passphrase.toBytes32(mnemonic)
     this.hdWallet = hdkey.fromMasterSeed(seed)
     this.root = this.hdWallet.derivePath(this.hdPath)
   }
 
+  /**
+   * Inits wallet from a given 32-byte random seed.
+   * @param {Uint8Array} seed
+   */
+  _initFromSeed (seed) {
+    if (seed.byteLength !== 32) {
+      throw new Error('Wallet seed is not 32 bytes.')
+    }
+    this.mnemonic = braveCrypto.passphrase.fromBytesOrHex(seed)
+    this.hdWallet = hdkey.fromMasterSeed(seed)
+    this.root = this.hdWallet.derivePath(this.hdPath)
+  }
 
   _getWalletForAccount (account) {
     const targetAddress = sigUtil.normalize(account)

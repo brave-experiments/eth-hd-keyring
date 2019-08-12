@@ -2,19 +2,33 @@ const assert = require('assert')
 const extend = require('xtend')
 const HdKeyring = require('../')
 const sigUtil = require('eth-sig-util')
+const braveCrypto = require('brave-crypto')
 
 // Sample account:
 const privKeyHex = 'b8a9c05beeedb25df85f8d641538cbffedf67216048de9c678ee26260eb91952'
 
-const sampleMnemonic = 'finish oppose decorate face calm tragic certain desk hour urge dinosaur mango'
-const firstAcct = '0x1c96099350f13d558464ec79b9be4445aa0ef579'
-const secondAcct = '0x1b00aed43a693f3a957f9feb5cc08afa031e37a0'
+const sampleMnemonic = 'today dream pistol mountain response need slab label harvest behave party slam license skate skirt ritual call regular one ivory neglect mass only lift'
+const firstAcct = '0xa567130473cc65df4760386ac22dc57e472c5bd9'
+const secondAcct = '0xe07067315726583991ec50731d2bcdda2a5d299c'
+
+const assertTypedArraysEquality = (a, b) => {
+  let equal = false
+  if (a.byteLength === b.byteLength) {
+    equal = a.every((val, i) => val === b[i])
+  }
+  if (!equal) {
+    console.log(a, b)
+  }
+  assert(equal)
+}
+
+const testKey = braveCrypto.getSeed(32)
 
 describe('hd-keyring', function() {
 
   let keyring
   beforeEach(function() {
-    keyring = new HdKeyring()
+    keyring = new HdKeyring({encryptionKey: braveCrypto.getSeed(32)})
   })
 
   describe('constructor', function(done) {
@@ -22,8 +36,8 @@ describe('hd-keyring', function() {
       keyring = new HdKeyring({
         mnemonic: sampleMnemonic,
         numberOfAccounts: 2,
+        encryptionKey: testKey
       })
-
       const accounts = keyring.getAccounts()
       .then((accounts) => {
         assert.equal(accounts[0], firstAcct)
@@ -78,6 +92,38 @@ describe('hd-keyring', function() {
       }).then((serialized) => {
         assert.equal(serialized.mnemonic, sampleMnemonic)
         done()
+      })
+    })
+  })
+
+  describe('initFromSeed', function () {
+    const sampleMnemonics = [
+      'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art',
+      'zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo vote'
+    ]
+    it('serializes to expected value 1', function () {
+      keyring._initFromSeed(new Uint8Array(32))
+      assert.equal(keyring.mnemonic, sampleMnemonics[0])
+    })
+    it('serializes to expected value 2', function () {
+      keyring._initFromSeed(new Uint8Array([
+        255, 255, 255, 255,
+        255, 255, 255, 255,
+        255, 255, 255, 255,
+        255, 255, 255, 255,
+        255, 255, 255, 255,
+        255, 255, 255, 255,
+        255, 255, 255, 255,
+        255, 255, 255, 255
+      ]))
+      assert.equal(keyring.mnemonic, sampleMnemonics[1])
+    })
+    it('throws if byte length is not 32', function () {
+      assert.throws(() => {
+        keyring._initFromSeed(new Uint8Array(16))
+      })
+      assert.throws(() => {
+        keyring._initFromSeed(new Uint8Array(24))
       })
     })
   })
@@ -187,7 +233,6 @@ describe('hd-keyring', function() {
 
     it('can deserialize with an hdPath param and generate the same accounts.', function (done) {
       const hdPathString = `m/44'/60'/0'/0`
-      const sampleMnemonic = 'finish oppose decorate face calm tragic certain desk hour urge dinosaur mango'
 
       keyring.deserialize({
         mnemonic: sampleMnemonic,
@@ -212,7 +257,6 @@ describe('hd-keyring', function() {
 
     it('can deserialize with an hdPath param and generate different accounts.', function (done) {
       const hdPathString = `m/44'/60'/0'/1`
-      const sampleMnemonic = 'finish oppose decorate face calm tragic certain desk hour urge dinosaur mango'
 
       keyring.deserialize({
         mnemonic: sampleMnemonic,
@@ -239,27 +283,26 @@ describe('hd-keyring', function() {
   describe('create and restore 1k accounts', function () {
     it('should restore same accounts with no problem', async function () {
       this.timeout(20000)
-
       for (let i = 0; i < 1e3; i++) {
-
         keyring = new HdKeyring({
           numberOfAccounts: 1,
-        })
+          encryptionKey: testKey
+        }, true)
+        const wallets = await keyring.init()
+        assert(wallets.length)
         const originalAccounts = await keyring.getAccounts()
+        assert(originalAccounts.length)
         const serialized = await keyring.serialize()
         const mnemonic = serialized.mnemonic
 
         keyring = new HdKeyring({
           numberOfAccounts: 1,
           mnemonic,
+          encryptionKey: testKey
         })
         const restoredAccounts = await keyring.getAccounts()
-
-        const first = originalAccounts[0]
-        const restored = restoredAccounts[0]
         const msg = `Should restore same account from mnemonic: "${mnemonic}"`
         assert.equal(restoredAccounts[0], originalAccounts[0], msg)
-
       }
 
       return true
