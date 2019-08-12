@@ -20,9 +20,10 @@ const bufToUint8Array = (buf) => {
 // polyfill chrome.braveWallets API for tests
 if (typeof global === 'object' && global.it) {
   if (typeof chrome === 'undefined') {
-    var chrome = {}
+    global.chrome = {}
   }
   if (!chrome.braveWallet) {
+    console.warn('WARNING: using chrome.braveWallet polyfill.')
     chrome.braveWallet = {}
     chrome.braveWallet.getWalletSeed = (key, cb) => {
       // Just use 32 random bytes generated in JS for now
