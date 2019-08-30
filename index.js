@@ -233,6 +233,7 @@ class HdKeyring extends EventEmitter {
     const sig = sigUtil.signTypedData_v4(privateKey, { data: typedData })
     return Promise.resolve(sig)
   }
+
 }
 
 HdKeyring.type = type
