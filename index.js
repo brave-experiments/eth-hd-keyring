@@ -4,6 +4,7 @@ const hdkey = require('ethereumjs-wallet/hdkey')
 const ethUtil = require('ethereumjs-util')
 const sigUtil = require('eth-sig-util')
 const braveCrypto = require('brave-crypto')
+const bip39 = require('bip39')
 
 // Options:
 const hdPathString = `m/44'/60'/0'/0`
@@ -170,7 +171,14 @@ class HdKeyring extends EventEmitter {
 
   _initFromMnemonic (mnemonic) {
     this.mnemonic = mnemonic
-    const seed = braveCrypto.passphrase.toBytes32(mnemonic)
+    let seed
+    try {
+      seed = braveCrypto.passphrase.toBytes32(mnemonic)
+    } catch (e) {
+      // Support metamask word restoration
+      console.warn('Could not get seed using brave-crypto.')
+      seed = bip39.mnemonicToSeed(mnemonic)
+    }
     this.hdWallet = hdkey.fromMasterSeed(seed)
     this.root = this.hdWallet.derivePath(this.hdPath)
   }
