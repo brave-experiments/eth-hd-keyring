@@ -96,6 +96,52 @@ describe('hd-keyring', function() {
     })
   })
 
+  describe('initFromMnemonic', function () {
+    const phrase12 = 'invite deer vivid fun attract sunny leave endless mutual teach around apology'
+    const phrase24 = 'resist dice daughter wrap diary gain combine museum charge blame lizard master logic coffee local announce connect blast insane spider work march upper swear'
+    it('returns expected value for bip39', function () {
+      const result = keyring._initFromMnemonic(phrase12)
+      assertTypedArraysEquality(result, new Buffer([198,240,17,131,9,253,8,111,11,216,253,20,246,146,126,6,226,140,128,239,121,65,64,213,0,144,3,6,161,4,157,67,184,192,184,91,123,204,43,196,172,141,165,120,234,133,198,72,151,130,81,200,198,211,113,90,160,140,12,163,17,37,115,40]))
+    })
+    it('returns expected value for 24 words', async function () {
+      const result = await keyring._initFromMnemonic(phrase24)
+      assertTypedArraysEquality(result, new Buffer([
+        183,
+        103,
+        172,
+        223,
+        127,
+        3,
+        212,
+        189,
+        139,
+        124,
+        141,
+        38,
+        130,
+        230,
+        11,
+        68,
+        88,
+        56,
+        90,
+        96,
+        208,
+        74,
+        47,
+        34,
+        237,
+        211,
+        232,
+        223,
+        217,
+        15,
+        187,
+        198
+      ]))
+    })
+  })
+
   describe('initFromSeed', function () {
     const sampleMnemonics = [
       'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art',
