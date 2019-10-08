@@ -181,6 +181,8 @@ class HdKeyring extends EventEmitter {
     }
     this.hdWallet = hdkey.fromMasterSeed(seed)
     this.root = this.hdWallet.derivePath(this.hdPath)
+    // return seed for testing
+    return seed
   }
 
   /**
