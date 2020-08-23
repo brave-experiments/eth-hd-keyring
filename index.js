@@ -142,12 +142,39 @@ class HdKeyring extends EventEmitter {
     return Promise.resolve(sig)
   }
 
-  // personal_signTypedData, signs data along with the schema
-  signTypedData (withAccount, typedData) {
-    const wallet = this._getWalletForAccount(withAccount)
-    const privKey = ethUtil.toBuffer(wallet.getPrivateKey())
-    const signature = sigUtil.signTypedData(privKey, { data: typedData })
-    return Promise.resolve(signature)
+  signTypedData (address, typedData, opts = { version: 'V1' }) {
+    if (!address) {
+      throw new Error('Address must be specified')
+    }
+
+    const wallet = this._getWalletForAccount(address, opts)
+    const privateKey = ethUtil.toBuffer(wallet.getPrivateKey())
+
+    switch (opts.version) {
+      case 'V1':
+        return this.signTypedData_v1(typedData, privateKey)
+      case 'V3':
+        return this.signTypedData_v3(typedData, privateKey)
+      case 'V4':
+        return this.signTypedData_v4(typedData, privateKey)
+      default:
+        return this.signTypedData_v1(typedData, privateKey)
+    }
+  }
+
+  signTypedData_v1 (typedData, privateKey) {
+    const sig = sigUtil.signTypedDataLegacy(privateKey, { data: typedData })
+    return Promise.resolve(sig)
+  }
+
+  signTypedData_v3 (typedData, privateKey) {
+    const sig = sigUtil.signTypedData(privateKey, { data: typedData })
+    return Promise.resolve(sig)
+  }
+
+  signTypedData_v4 (typedData, privateKey) {
+    const sig = sigUtil.signTypedData_v4(privateKey, { data: typedData })
+    return Promise.resolve(sig)
   }
 
   // For eth_sign, we need to sign transactions:
