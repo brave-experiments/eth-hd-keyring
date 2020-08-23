@@ -152,29 +152,14 @@ class HdKeyring extends EventEmitter {
 
     switch (opts.version) {
       case 'V1':
-        return this.signTypedData_v1(typedData, privateKey)
+        return this._signTypedData_v1(typedData, privateKey)
       case 'V3':
-        return this.signTypedData_v3(typedData, privateKey)
+        return this._signTypedData_v3(typedData, privateKey)
       case 'V4':
-        return this.signTypedData_v4(typedData, privateKey)
+        return this._signTypedData_v4(typedData, privateKey)
       default:
-        return this.signTypedData_v1(typedData, privateKey)
+        return this._signTypedData_v1(typedData, privateKey)
     }
-  }
-
-  signTypedData_v1 (typedData, privateKey) {
-    const sig = sigUtil.signTypedDataLegacy(privateKey, { data: typedData })
-    return Promise.resolve(sig)
-  }
-
-  signTypedData_v3 (typedData, privateKey) {
-    const sig = sigUtil.signTypedData(privateKey, { data: typedData })
-    return Promise.resolve(sig)
-  }
-
-  signTypedData_v4 (typedData, privateKey) {
-    const sig = sigUtil.signTypedData_v4(privateKey, { data: typedData })
-    return Promise.resolve(sig)
   }
 
   // For eth_sign, we need to sign transactions:
@@ -232,6 +217,21 @@ class HdKeyring extends EventEmitter {
       return ((address === targetAddress) ||
               (sigUtil.normalize(address) === targetAddress))
     })
+  }
+
+  _signTypedData_v1 (typedData, privateKey) {
+    const sig = sigUtil.signTypedDataLegacy(privateKey, { data: typedData })
+    return Promise.resolve(sig)
+  }
+
+  _signTypedData_v3 (typedData, privateKey) {
+    const sig = sigUtil.signTypedData(privateKey, { data: typedData })
+    return Promise.resolve(sig)
+  }
+
+  _signTypedData_v4 (typedData, privateKey) {
+    const sig = sigUtil.signTypedData_v4(privateKey, { data: typedData })
+    return Promise.resolve(sig)
   }
 }
 
